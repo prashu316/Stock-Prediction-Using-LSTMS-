@@ -10,8 +10,16 @@ test = test [['Date','Open','Close']]
 db['Date'] = pd.to_datetime(db['Date'].apply(lambda x: x.split()[0]))
 test['Date'] = pd.to_datetime(test['Date'].apply(lambda x: x.split()[0]))
 
+
+
 db.set_index('Date',drop=True,inplace=True)
 test.set_index('Date',drop=True,inplace=True)
+from sklearn.preprocessing import MinMaxScaler
+Ms = MinMaxScaler()
+db[db.columns] = Ms.fit_transform(db)
+training_size = round(len(db ) * 0.95)
+train_data = db [:training_size]
+test_data  = db [training_size:]
 
 print(db.head())
 print(test.head())
@@ -30,10 +38,8 @@ ax[1].legend()
 plt.show()
 '''
 
-from sklearn.preprocessing import MinMaxScaler
-Ms = MinMaxScaler()
-db[db.columns] = Ms.fit_transform(db)
-test[test.columns] = Ms.fit_transform(test)
+
+#test[test.columns] = Ms.fit_transform(test)
 #print(db.head())
 
 
@@ -47,8 +53,8 @@ def create_sequence(dataset):
         start_idx += 1
     return (np.array(sequences),np.array(labels))
 
-train_seq, train_label = create_sequence(db)
-test_seq, test_label = create_sequence(test)
+train_seq, train_label = create_sequence(train_data)
+test_seq, test_label = create_sequence(test_data)
 
 #print(test_label)
 
@@ -68,3 +74,10 @@ model.compile(loss='mean_squared_error', optimizer='adam', metrics=['mean_absolu
 model.summary()
 
 model.fit(train_seq, train_label, epochs=80,validation_data=(test_seq, test_label), verbose=1)
+test_predicted = model.predict(test_seq)
+test_inverse_predicted = Ms.inverse_transform(test_predicted)
+# Merging actual and predicted data for better visualization
+db_slic = pd.concat([db.iloc[-61:].copy(),pd.DataFrame(test_inverse_predicted,columns=['open_predicted','close_predicted'],index=db .iloc[-61:].index)], axis=1)
+db_slic[['Open','Close']] = Ms.inverse_transform(db_slic[['Open','Close']])
+db_slic.to_csv(r'pred_results.csv')
+print(db_slic.head())
